@@ -1,0 +1,160 @@
+# VeloLedger — Multi-Currency Double-Entry Ledger API
+
+VeloLedger is a high-performance, secure, multi-currency double-entry ledger application. It features a modern, responsive single-page dashboard for wallet administration, double-entry transaction drafting, and asynchronous PDF statement generation with automated background email delivery.
+
+---
+
+## Technical Stack
+* **Backend Framework:** PHP 8.4 & Symfony 7
+* **Web Server:** FrankenPHP (Caddy-powered, optimized for performance)
+* **Database:** PostgreSQL 16 with **PgBouncer** connection pooling
+* **Cache & Queue:** Redis 7 (stores messages for background worker execution)
+* **PDF Generation:** Dompdf (HTML-to-PDF rendering for financial statements)
+* **Local Mail Catcher:** Mailpit (intercepts all emails in development)
+* **CI/CD:** GitHub Actions (code style, static analysis, tests, security audit)
+
+---
+
+## Quick Start Guide
+
+Follow these commands in sequence to get the application running on your localhost.
+
+### 1. Build and Start the Docker Containers
+Launch all microservices (web server, database, pgbouncer, redis cache, worker, mailer) in detached mode:
+```bash
+docker compose up -d --build
+```
+
+### 2. Install Composer Dependencies
+Download and install backend PHP dependencies inside the container:
+```bash
+docker compose exec php composer install
+```
+
+### 3. Generate JWT Security Keys
+Set up private/public key pairs used for securing the APIs:
+```bash
+docker compose exec php bin/console lexik:jwt:generate-keypair --skip-if-exists
+```
+
+### 4. Create and Migrate Database
+Create the database and apply the database migrations to build the tables structure:
+```bash
+# Create the database if it does not exist
+docker compose exec php bin/console doctrine:database:create --if-not-exists
+
+# Apply migrations
+docker compose exec php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+> **Note:** If migrations are not yet generated for the latest schema changes, you can synchronize the schema directly:
+> ```bash
+> docker compose exec php bin/console doctrine:schema:update --force
+> ```
+
+### 5. Clear Application Cache
+Ensure all routes and configuration mappings are loaded fresh:
+```bash
+docker compose exec php bin/console cache:clear
+```
+
+### 6. Access the Application
+* **Frontend Web Dashboard:** [http://localhost:8000](http://localhost:8000)
+* **Local Mailpit Dashboard:** [http://localhost:8025](http://localhost:8025)
+
+---
+
+## Testing & Features Checklist
+
+### 1. User Registration & Auth
+Go to [http://localhost:8000](http://localhost:8000), toggle the auth form to **Register**, sign up with any email, and log in. A secure JWT token will be generated, stored, and rotated automatically behind the scenes.
+
+### 2. Seeding Test Wallets (1-Click Test Data)
+To verify calculations instantly, click the **Test Wallets** button on the bottom left. 
+* This spawns **21 pre-configured test wallets** (under the customer ID prefix `test_liq_`) with realistic initial balances in **EUR**, **USD**, and **GBP**.
+* Once created, the **Test Wallets** button is locked and **Delete Test Wallets** becomes active.
+* Logging out and back in retains these wallets in the layouts, and they can be deleted from the database entirely using the **Delete Test Wallets** button.
+
+### 3. Balanced Double-Entry Form
+Test the transaction creator:
+* Double-entry bookkeeping requires that the sum of **Debits (DR)** equals **Credits (CR)**.
+* Selecting different currencies in a single transaction triggers a **Currency Mismatch** error badge.
+* The form only unlocks the **Post Transaction** button once all lines share the same currency and the net difference is exactly `0.00`.
+
+### 4. PDF Compilation & Email Queue
+* Select a wallet on the left pane and click **Compile Statement PDF** on the right side.
+* Enter an email address.
+* The backend generates a professional PDF statement using **Dompdf** and schedules it as a background task.
+* The **worker** container picks up the task asynchronously and mails the PDF attachment.
+
+---
+
+## Maintenance Commands
+
+### Purge Expired Refresh Tokens
+Over time, revoked and expired refresh tokens accumulate in the database. Clean them up with:
+```bash
+docker compose exec php bin/console app:tokens:purge
+```
+
+### Restart Background Workers
+If you change environment variables or update the handler code, restart the workers so they reload the new configuration:
+```bash
+docker compose exec php bin/console messenger:stop-workers
+```
+
+---
+
+## CI/CD Pipeline (GitHub Actions)
+
+The project includes a GitHub Actions workflow at `.github/workflows/ci.yml` that runs automatically on every push or pull request to `main` and `develop`. The pipeline has 4 stages:
+
+| Stage | Tool | What it checks |
+|---|---|---|
+| 🎨 **Code Style** | PHP CS Fixer | PSR-12 compliance, strict types, short array syntax |
+| 🔍 **Static Analysis** | PHPStan (Level 9) | Type safety, Doctrine/Symfony integration |
+| 🧪 **Tests** | PHPUnit | Unit & functional tests (SQLite) |
+| 🔒 **Security Audit** | `composer audit` | Known CVEs in dependencies |
+
+No additional setup is needed — the pipeline activates automatically when the repository is pushed to GitHub.
+
+---
+
+## Emailing Systems & Configurations
+
+### Development Environment (Mailpit Catcher)
+By default, the application environment variable `MAILER_DSN` is set to `smtp://mailer:1025` inside `docker-compose.yaml`.
+* No emails leave your localhost server.
+* All outbound statement emails are caught by **Mailpit** and can be viewed inside your browser at [http://localhost:8025](http://localhost:8025).
+
+### Real-World Production Environment (External SMTP)
+If you want the PDF statements to be sent to a real email address (e.g. Gmail, Outlook, Brevo):
+
+1. Create a `.env.local` file in the root folder of the project.
+2. Override the `MAILER_DSN` variable with your actual SMTP credentials:
+
+   **For Gmail (requires App Password):**
+   ```ini
+   MAILER_DSN=gmail://YOUR_EMAIL@gmail.com:YOUR_GOOGLE_APP_PASSWORD@default
+   ```
+   *(Ensure 2-Factor Authentication is enabled in your Google account setting, then generate a 16-character "App Password").*
+
+   **For Brevo (formerly Sendinblue):**
+   ```ini
+   MAILER_DSN=smtp://YOUR_BREVO_EMAIL:YOUR_BREVO_SMTP_KEY@smtp-relay.brevo.com:587
+   ```
+
+   **For generic domain SMTP servers:**
+   ```ini
+   MAILER_DSN=smtp://username:password@smtp.yourdomain.com:587
+   ```
+
+3. **Restart the containers (CRITICAL):**
+   Because the worker container processes emails in a persistent background CLI session, it caches environment settings. You must restart Docker to reload the `.env.local` config:
+   ```bash
+   docker compose down
+   # Start again
+   docker compose up -d
+   # Clear symfony cache just in case
+   docker compose exec php bin/console cache:clear
+   ```

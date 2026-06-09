@@ -1,0 +1,116 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - .:/app
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      SERVER_NAME: :8000
+      DATABASE_URL: "postgresql://symfony:symfony_secret@database:5432/ledger?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "redis://cache:6379/messages"
+      REDIS_URL: "redis://cache:6379"
+      DEFAULT_URI: "http://localhost:8000"
+      MAILER_DSN: "smtp://mailer:1025"
+    command: frankenphp run --config /etc/caddy/Caddyfile
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      cache:
+        condition: service_healthy
+      mailer:
+        condition: service_started
+
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_USER=symfony
+      - DB_PASS=symfony_secret
+      - DB_NAME=ledger
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=10000
+      - DEFAULT_POOL_SIZE=20
+      - LISTEN_PORT=6432
+      - AUTH_TYPE=trust
+    depends_on:
+      database:
+        condition: service_healthy
+
+
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ledger
+      POSTGRES_USER: symfony
+      POSTGRES_PASSWORD: symfony_secret
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U symfony -d ledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: "postgresql://symfony:symfony_secret@database:5432/ledger?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "redis://cache:6379/messages"
+      REDIS_URL: "redis://cache:6379"
+      MAILER_DSN: "smtp://mailer:1025"
+    command: php bin/console messenger:consume async -vv
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      mailer:
+        condition: service_started
+
+
+  mailer:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

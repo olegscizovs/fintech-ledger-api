@@ -1,0 +1,115 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+env:
+  PHP_VERSION: '8.4'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Stage 1: Code Style (fastest — fails first)
+  # ──────────────────────────────────────────────
+  code-style:
+    name: 🎨 Code Style (PHP CS Fixer)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          tools: php-cs-fixer
+
+      - name: Run PHP CS Fixer (dry-run)
+        run: php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php
+
+  # ──────────────────────────────────────────────
+  # Stage 2: Static Analysis
+  # ──────────────────────────────────────────────
+  static-analysis:
+    name: 🔍 Static Analysis (PHPStan Level 9)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_sqlite, bcmath, redis
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Generate JWT keypair for container compilation
+        run: |
+          mkdir -p config/jwt
+          openssl genpkey -algorithm RSA -out config/jwt/private.pem -pkeyopt rsa_keygen_bits:4096 2>/dev/null
+          openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem 2>/dev/null
+
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --error-format=github
+
+  # ──────────────────────────────────────────────
+  # Stage 3: Unit & Functional Tests
+  # ──────────────────────────────────────────────
+  tests:
+    name: 🧪 Tests (PHPUnit)
+    runs-on: ubuntu-latest
+    needs: [code-style, static-analysis]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_sqlite, bcmath, redis
+          coverage: xdebug
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Generate JWT keypair for test environment
+        run: |
+          mkdir -p config/jwt
+          openssl genpkey -algorithm RSA -out config/jwt/private.pem -pkeyopt rsa_keygen_bits:4096 2>/dev/null
+          openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem 2>/dev/null
+
+      - name: Set JWT passphrase
+        run: echo "JWT_PASSPHRASE=''" >> .env.test.local
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit --colors=always
+
+  # ──────────────────────────────────────────────
+  # Stage 4: Security Audit
+  # ──────────────────────────────────────────────
+  security:
+    name: 🔒 Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run Symfony Security Checker
+        run: composer audit

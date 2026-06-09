@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure FinTech Ledger Dashboard</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- External CSS Style -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body style="background-color: #0b0f19;">
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- 1. Authentication View -->
+    <div id="auth-container" style="display: none;">
+        <div class="glass-card">
+            <!-- Language switcher for Auth page -->
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                <div class="lang-switcher" style="display: flex; gap: 8px;">
+                    <span onclick="setLanguage('de')" class="lang-span active" id="auth-lang-de">DE</span>
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
+                    <span onclick="setLanguage('en')" class="lang-span" id="auth-lang-en">EN</span>
+                </div>
+            </div>
+            <div class="auth-logo">
+                <h1 id="auth-title" data-i18n="title">VeloLedger</h1>
+                <p id="auth-subtitle" data-i18n="subtitle">Secure Multi-Currency Double-Entry Ledger API</p>
+            </div>
+            
+            <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+                <div class="form-group">
+                    <label for="auth-email" data-i18n="emailLabel">Email Address</label>
+                    <input type="email" id="auth-email" name="username" autocomplete="username" required placeholder="admin@velo.finance">
+                </div>
+                <div class="form-group">
+                    <label for="auth-password" data-i18n="passwordLabel">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="auth-password" name="password" autocomplete="current-password" required placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility()" aria-label="Toggle Password Visibility">👁️</button>
+                    </div>
+                </div>
+
+
+                
+                <button type="submit" id="auth-submit-btn" class="btn" style="margin-top: 12px;">
+                    <span data-i18n="loginBtn">Login</span>
+                </button>
+            </form>
+            
+            <div class="toggle-link" id="auth-toggle">
+                Don't have an account? <span onclick="toggleAuthMode()">Register</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Main Application Dashboard -->
+    <div id="app-container" style="display: none;">
+        <header>
+            <div class="logo" style="display: flex; align-items: center; gap: 16px;">
+                <h2>VeloLedger</h2>
+                <div class="test-wallet-controls" style="display: flex; gap: 8px;">
+                    <button id="btn-add-test-wallets" onclick="createTestWallets()" class="btn btn-sm" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: auto; font-size: 0.8rem; height: 32px; padding: 0 12px;" data-i18n="addTestWallets">Test Wallets</button>
+                    <button id="btn-delete-test-wallets" onclick="deleteTestWallets()" class="btn btn-sm btn-outline" style="width: auto; font-size: 0.8rem; height: 32px; padding: 0 12px; border-color: var(--danger-color); color: var(--danger-color);" data-i18n="deleteTestWallets" disabled>Delete Test Wallets</button>
+                </div>
+            </div>
+            <div class="user-menu">
+                <!-- Language Switcher -->
+                <div class="lang-switcher" style="margin-right: 8px;">
+                    <button onclick="setLanguage('de')" id="lang-btn-de" class="btn-lang active">DE</button>
+                    <button onclick="setLanguage('en')" id="lang-btn-en" class="btn-lang">EN</button>
+                </div>
+                <div class="user-info">
+                    <div class="email" id="user-display-email">User</div>
+                    <div class="token-status">
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="4" cy="4" r="4" fill="#10B981"/>
+                        </svg>
+                        <span data-i18n="sessionActive">Session active (JWT)</span>
+                    </div>
+                </div>
+                <button onclick="handleLogout()" class="btn btn-outline btn-sm" data-i18n="logoutBtn">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <!-- Left Side Panels: Accounts list & Transaction creator -->
+            <div style="display: flex; flex-direction: column; gap: 32px;">
+                
+                <!-- Panel 1: Accounts / Wallets Overview -->
+                <div class="panel">
+                    <h3>
+                        <span data-i18n="walletsTitle">Wallets</span>
+                        <button onclick="showCreateAccountModal()" class="btn btn-sm" data-i18n="openWalletBtn">Open Wallet</button>
+                    </h3>
+                    
+                    <!-- Search and Sort Controls -->
+                    <div class="wallets-controls">
+                        <div class="search-box">
+                            <input type="text" id="wallet-search" placeholder="Search by name..." data-i18n-placeholder="searchPlaceholder" oninput="handleWalletSearchAndSort()">
+                        </div>
+                        <div class="sort-box">
+                            <select id="wallet-sort" onchange="handleWalletSearchAndSort()">
+                                <option value="name-asc" data-i18n="sortNameAsc">A-Z</option>
+                                <option value="name-desc" data-i18n="sortNameDesc">Z-A</option>
+                                <option value="date-desc" data-i18n="sortDateDesc">Newest</option>
+                                <option value="date-asc" data-i18n="sortDateAsc">Oldest</option>
+                                <option value="balance-asc" data-i18n="sortBalanceAsc">Amount: Low-High</option>
+                                <option value="balance-desc" data-i18n="sortBalanceDesc">Amount: High-Low</option>
+                                <option value="currency-asc" data-i18n="sortCurrencyAsc">Currency: A-Z</option>
+                                <option value="currency-desc" data-i18n="sortCurrencyDesc">Currency: Z-A</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Inline Account Creation Form (Collapsible/Hidden by default) -->
+                    <div id="create-account-box" style="display: none; background: rgba(15, 23, 42, 0.4); border: 1px dashed var(--card-border); padding: 16px; border-radius: 12px; margin-bottom: 8px;">
+                        <h4 style="font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;" data-i18n="openWalletTitle">Open Customer Wallet</h4>
+                        <form id="create-account-form" onsubmit="handleCreateAccount(event)">
+                            <div class="form-group">
+                                <label for="acc-name" data-i18n="walletNameLabel">Account Name</label>
+                                <input type="text" id="acc-name" required placeholder="Main Checking USD">
+                            </div>
+                            <div class="form-group">
+                                <label for="acc-customer" data-i18n="customerIdLabel">Customer ID</label>
+                                <input type="text" id="acc-customer" required placeholder="cust_1234">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label for="acc-currency" data-i18n="currencyLabel">Currency</label>
+                                    <select id="acc-currency" required onchange="updateCreateAccountSuffix()">
+                                        <option value="USD">USD ($)</option>
+                                        <option value="EUR">EUR (€)</option>
+                                        <option value="GBP">GBP (£)</option>
+                                    </select>
+                                </div>
+                                 <div class="form-group">
+                                     <label for="acc-balance" data-i18n="initialBalanceLabel">Initial Balance</label>
+                                     <div class="input-with-suffix">
+                                         <input type="number" id="acc-balance" step="any" placeholder="0.00" value="0.00">
+                                         <span class="input-suffix" id="create-acc-currency-suffix">USD</span>
+                                     </div>
+                                     <small class="form-hint" id="create-acc-balance-hint" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; display: block; line-height: 1.3;">Note: Enter standard amount. E.g. entering '10' or '10.00' equals 10.00 USD. (We support 4 decimal places for micro-transactions, e.g. 10.0000 USD).</small>
+                                 </div>
+                             </div>
+                            <div style="display: flex; gap: 12px; margin-top: 12px;">
+                                <button type="submit" class="btn btn-sm" data-i18n="openBtn">Open</button>
+                                <button type="button" onclick="hideCreateAccountModal()" class="btn btn-outline btn-sm" data-i18n="cancelBtn">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Inline Account Edit Form (Collapsible/Hidden by default) -->
+                    <div id="edit-account-box" style="display: none; background: rgba(15, 23, 42, 0.4); border: 1px dashed var(--card-border); padding: 16px; border-radius: 12px; margin-bottom: 8px;">
+                        <h4 style="font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;" data-i18n="editWalletTitle">Edit Customer Wallet</h4>
+                        <form id="edit-account-form" onsubmit="handleEditAccount(event)">
+                            <input type="hidden" id="edit-acc-uuid">
+                            <div class="form-group">
+                                <label for="edit-acc-name" data-i18n="walletNameLabel">Account Name</label>
+                                <input type="text" id="edit-acc-name" required placeholder="Main Checking USD">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-acc-customer" data-i18n="customerIdLabel">Customer ID</label>
+                                <input type="text" id="edit-acc-customer" required placeholder="cust_1234">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-acc-currency" data-i18n="currencyLabel">Currency</label>
+                                <select id="edit-acc-currency" required>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                    <option value="GBP">GBP (£)</option>
+                                </select>
+                                <small style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;" data-i18n="currencyEditWarn">Currency can only be changed if no transactions have been posted.</small>
+                            </div>
+                            <div style="display: flex; gap: 12px; margin-top: 12px;">
+                                <button type="submit" class="btn btn-sm" data-i18n="saveChangesBtn">Save Changes</button>
+                                <button type="button" onclick="hideEditAccountModal()" class="btn btn-outline btn-sm" data-i18n="cancelBtn">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="accounts-list-container" class="account-grid">
+                        <div class="empty-state">
+                            <div class="spinner"></div>
+                            <p data-i18n="loadingWallets">Loading wallets...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: balanced transaction builder -->
+                <div class="panel">
+                    <h3 data-i18n="balancedFormTitle">Balanced Transaction Form</h3>
+                    <form id="transaction-form" onsubmit="handlePostTransaction(event)">
+                        <div class="form-group">
+                            <label for="tx-desc" data-i18n="descLabel">Description</label>
+                            <input type="text" id="tx-desc" required placeholder="Wire Transfer - Settlement">
+                        </div>
+                        
+                        <div id="entries-container">
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                                <label style="display: block; margin-bottom: 0;" data-i18n="ledgerLinesLabel">Double-Entry Ledger Lines</label>
+                                <small class="form-hint" style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;" data-i18n="txAmountInputHint">Enter amounts without thousands separators (e.g. 10.50 for 10.50 €).</small>
+                            </div>
+                            <!-- Dynamic rows will be inserted here -->
+                        </div>
+                        
+                        <button type="button" onclick="addEntryRow()" class="btn btn-outline btn-sm" style="width: auto; margin-top: 8px;" data-i18n="addLedgerLineBtn">
+                            ➕ Add Ledger Line
+                        </button>
+                        
+                        <!-- Help Guidelines Box -->
+                        <div class="tx-help-box" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--card-border); padding: 16px; border-radius: 8px; font-size: 0.8rem; margin-top: 16px; margin-bottom: 16px;">
+                            <h5 style="font-weight: 600; margin-bottom: 8px; font-size: 0.85rem;" data-i18n="txFormHelpTitle">How to use this form?</h5>
+                            <p style="color: var(--text-muted); margin-bottom: 10px; line-height: 1.35;" data-i18n="txFormHelpText">Double-entry rules require that total Debits (DR) must exactly equal total Credits (CR). The 'Post Transaction' button becomes active only when the entries are balanced (Difference = 0.0000).</p>
+                            <ul style="list-style: none; padding-left: 0; display: flex; flex-direction: column; gap: 6px;">
+                                <li style="color: var(--danger-color); display: flex; align-items: center; gap: 6px; font-weight: 500;">
+                                    <span style="font-size: 0.6rem;">🔴</span>
+                                    <span data-i18n="debitHelp">Debit (DR): Money leaves this wallet (decrease)</span>
+                                </li>
+                                <li style="color: var(--success-color); display: flex; align-items: center; gap: 6px; font-weight: 500;">
+                                    <span style="font-size: 0.6rem;">🟢</span>
+                                    <span data-i18n="creditHelp">Credit (CR): Money enters this wallet (increase)</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="form-actions-bar">
+                            <div class="balance-indicator">
+                                <div class="balance-sum">
+                                    <span>DR: <strong id="sum-debits">0.0000</strong></span>
+                                    <span>CR: <strong id="sum-credits">0.0000</strong></span>
+                                </div>
+                                <div id="balance-status-badge" class="balance-status unbalanced">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="4" cy="4" r="4" fill="currentColor"/>
+                                    </svg>
+                                    <span id="balance-status-text" data-i18n="unbalanced">Unbalanced</span>
+                                </div>
+                            </div>
+                            <button type="submit" id="post-tx-btn" class="btn btn-sm" disabled style="width: auto;">
+                                <span data-i18n="postTxBtn">Post Transaction</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Reason disabled notification block -->
+                        <div id="tx-disabled-reason" style="font-size: 0.75rem; color: var(--warning-color); margin-top: 12px; display: block; line-height: 1.35; padding: 8px 12px; border-radius: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.15);" data-i18n="btnDisabledReason">
+                            Note: Posting is disabled because Debits (DR) and Credits (CR) are unbalanced, fields are empty, or there are less than 2 lines.
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Side Panel: Ledger history view / Statements -->
+            <div class="panel" style="min-height: 500px;">
+                <div class="statement-header">
+                    <h3>
+                        <span id="statement-title" data-i18n="ledgerHistoryTitle">Ledger History</span>
+                    </h3>
+                    <button id="pdf-compile-btn" class="btn btn-outline btn-sm" disabled onclick="triggerStatementCompile()" data-i18n="compilePdfBtn">
+                        Compile Statement PDF
+                    </button>
+                </div>
+                
+                <div id="statement-container" class="statement-list">
+                    <div class="empty-state">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <p data-i18n="emptyHistoryPrompt">Select a wallet on the left to inspect ledger history</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- External JavaScript Application Client -->
+    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/test-suite.js"></script>
+</body>
+</html>

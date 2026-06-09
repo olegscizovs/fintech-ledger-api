@@ -1,0 +1,26 @@
+#!/usr/bin/env php
+<?php
+
+use App\Kernel;
+use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\ErrorHandler\Debug;
+
+if (!file_exists(dirname(__DIR__).'/vendor/autoload_runtime.php')) {
+    throw new LogicException('Symfony Runtime is missing. Try running "composer require symfony/runtime".');
+}
+
+$_SERVER['APP_RUNTIME_OPTIONS'] = $_SERVER['APP_RUNTIME_OPTIONS'] ?? [];
+$_SERVER['APP_RUNTIME_OPTIONS']['project_dir'] = $_SERVER['APP_RUNTIME_OPTIONS']['project_dir'] ?? dirname(__DIR__);
+
+require dirname(__DIR__).'/vendor/autoload_runtime.php';
+
+return function (array $context) {
+    if ($context['APP_DEBUG']) {
+        umask(0000);
+        Debug::enable();
+    }
+
+    $kernel = new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
+    return new Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
+};
+

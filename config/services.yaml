@@ -1,0 +1,22 @@
+# config/services.yaml
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            $apiLimiter: '@limiter.api_limiter'
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # ADD THIS TAGGING BLOCK HERE:
+    # Explicitly force Symfony to treat everything inside Controllers as a public routing service
+    App\Common\Controller\:
+        resource: '../src/Common/Controller/'
+        tags: ['controller.service_arguments']
