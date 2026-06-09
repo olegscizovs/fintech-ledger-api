@@ -58,7 +58,7 @@ jobs:
           openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem 2>/dev/null
 
       - name: Run PHPStan
-        run: vendor/bin/phpstan analyse -c phpstan.neon --no-progress --error-format=github
+        run: vendor/bin/phpstan analyse --no-progress --error-format=github
 
   # ──────────────────────────────────────────────
   # Stage 3: Unit & Functional Tests
