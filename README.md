@@ -162,10 +162,19 @@ Wenn Sie PDFs an reale E-Mail-Adressen senden möchten:
 
 
 
-
-
+-
+-
+-
+-
+-
+-
 -------------------------------------------------------------------------- ENGLISH ---------------------------------------------------------
-
+-
+-
+-
+-
+-
+-
 
 
 # VeloLedger — Multi-Currency Double-Entry Ledger API
