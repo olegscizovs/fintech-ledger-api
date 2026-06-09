@@ -35,7 +35,8 @@ class PurgeTokensCommand extends Command
             ->setParameter('now', new \DateTimeImmutable())
             ->getQuery();
 
-        $deletedCount = (int) $query->execute();
+        $result = $query->execute();
+        $deletedCount = is_int($result) ? $result : 0;
 
         $io->success(sprintf('Successfully purged %d expired or revoked refresh token(s).', $deletedCount));
 
